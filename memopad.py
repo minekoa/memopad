@@ -18,19 +18,17 @@ class Subject(object):
 
 
 class Memo (Subject):
-    def __init__(self):
+    def __init__(self, createDate=None):
         Subject.__init__(self)
 
         self.text = ''
-        self.datetime = datetime.now()
-
+        if createDate == None:
+            self.datetime = datetime.now()
+        else:
+            self.datetime = createDate
 
     def getDatetime(self):
         return self.datetime
-
-    def setDatetime(self, datetime):
-        self.datetime = datetime
-    
 
     def getTitle(self):
         try:
@@ -50,6 +48,7 @@ class Memo (Subject):
 
 import os
 import os.path
+import glob
 import re
 
 
@@ -61,6 +60,7 @@ class MemoPad(Subject):
         self.memos = []
         self.selectedIndex = -1
 
+        self.trashbox = []
 
 
     #==================================
@@ -87,40 +87,48 @@ class MemoPad(Subject):
         self.selectedIndex = -1
 
         # イメージリストのロード
-        for (root, dirs, files) in os.walk( os.path.join(os.curdir, 'memo') ):
-            print '***', root, '***'
-            for filename in files:
-                matobj = ptn.match( filename )
-                if matobj != None:
+        os.chdir('memo') 
+        for filepath in glob.glob("*.memo"):
+            matobj = ptn.match( filepath )
+            if matobj != None:
+                # Memo の生成と初期化
+                memo = Memo( datetime( int(matobj.group(1)),
+                                       int(matobj.group(2)),
+                                       int(matobj.group(3)),
+                                       int(matobj.group(4)),
+                                       int(matobj.group(5)),
+                                       int(matobj.group(6)),
+                                       int(matobj.group(7)) ) )
+                memo.setText( open( filepath, 'r' ).read().decode('shift_jis') )
 
-                    # Memo の生成と初期化
-                    memo = Memo()
-                    memo.setDatetime( datetime( int(matobj.group(1)),
-                                                int(matobj.group(2)),
-                                                int(matobj.group(3)),
-                                                int(matobj.group(4)),
-                                                int(matobj.group(5)),
-                                                int(matobj.group(6)),
-                                                int(matobj.group(7)) ) )
-                    memo.setText( open( os.path.join('memo', filename), 'r' ).read().decode('shift_jis') )
-                    memo.addObserver(self)
-
-                    print memo.getDatetime().__str__(),memo.getTitle()
-
-                    # 登録
-                    self.memos.insert(0, memo)
-
+                # 登録
+                memo.addObserver(self)
+                self.memos.insert(0, memo)
+                print memo.getDatetime().__str__(),memo.getTitle()
+        os.chdir('..') 
 
         # カーソルの初期化
         if len(self.memos) != 0:
             self.selectedIndex = 0
 
 
+    def memoToFilename(self, memo):
+        return '%s%06d.memo' % (memo.getDatetime().strftime("%Y-%m-%dT%H%M%S"),
+                                memo.getDatetime().microsecond )
+
+
     def saveImage(self):
         for i in self.memos:
-            f = open( 'memo/%s%06d.memo' % (i.getDatetime().strftime("%Y-%m-%dT%H%M%S"),
-                                            i.getDatetime().microsecond), "w")
+            f = open( 'memo/%s' % self.memoToFilename(i), 'w' )
             f.write( i.getText().encode('shift_jis') )
+
+        self.clearTrashbox()
+
+
+    def clearTrashbox(self):
+        for i in self.trashbox:
+            os.remove( 'memo/%s' % self.memoToFilename(i) )
+            print "rmv「", rmvtarget.getText(), "」"
 
 
     #==================================
@@ -147,7 +155,7 @@ class MemoPad(Subject):
         if len(self.memos) <= self.selectedIndex:
             self.selectedIndex = len(self.memos) -1
 
-        print "rmv「", rmvtarget.getText(), "」"
+        self.trashbox.append( rmvtarget ) # イメージファイルから除去するために覚えておく
         self.notifyUpdate("removeMemo", self)
 
 
@@ -193,7 +201,7 @@ class MemoPadFrame( Frame ):
         Frame.__init__(self, master)
 
         # Modelの初期化
-        self.version = (0, 2, 0)
+        self.version = (0, 2, 1)
         self.memos = MemoPad()
         self.memos.loadImage()
         self.memos.addObserver(self)
@@ -205,11 +213,6 @@ class MemoPadFrame( Frame ):
         self.pack(fill=BOTH)
 
         self.update(None,None)
-
-#        self.fill_testlist()
-#        self.memoList.selection_set( 0 )
-#        self.openMemo( self.memos[0] )
-
 
 
         def bye():
@@ -235,8 +238,8 @@ class MemoPadFrame( Frame ):
 
 
         self.memoList = ScrolledListbox(frm,
-                                        selectmode=BROWSE,#SINGLE,
-                                        width=50,
+                                        selectmode=BROWSE,
+                                        width=70,
                                         height=5 )
         self.memoList.bind("<ButtonRelease>", changeTarget )
         self.memoList.pack(side=LEFT, fill=BOTH)
