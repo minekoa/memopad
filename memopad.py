@@ -37,18 +37,9 @@ import os.path
 import re
 
 
-class MemoPad( Frame ):
+class MemoPadFrame( Frame ):
 
-    def __init__(self, master=None):
-        Frame.__init__(self, master)
-
-        self.memos = []
-        self.selectedIndex = -1
-
-
-        self.version = (0, 1, 0)
-        self.master.title( 'MemoPad %d.%d.%d' % self.version )
-
+    def loadImage(self):
         ptn = re.compile( r"(\d{4})-(\d{2})-(\d{2})T(\d{2})(\d{2})(\d{2})(\d{6})\.memo" )
 
         for (root, dirs, files) in os.walk( os.path.join(os.curdir, 'memo') ):
@@ -65,9 +56,28 @@ class MemoPad( Frame ):
                                                 int(matobj.group(7)) ) )
                     memo.setText( open( os.path.join('memo', filename), 'r' ).read().decode('shift_jis') )
                     print memo.getDatetime().__str__(),memo.getText()
-                    self.memos.append( memo )
+#                    self.memos.append( memo )
+                    self.memos.insert(0, memo)
 
 
+    def saveImage(self):
+        for i in self.memos:
+            f = open( 'memo/%s%06d.memo' % (i.getDatetime().strftime("%Y-%m-%dT%H%M%S"),
+                                            i.getDatetime().microsecond), "w")
+            f.write( i.getText().encode('shift_jis') )
+
+
+
+    def __init__(self, master=None):
+        Frame.__init__(self, master)
+
+        self.version = (0, 1, 1)
+
+        self.memos = []
+        self.selectedIndex = -1
+        self.loadImage()
+
+        self.master.title( 'MemoPad %d.%d.%d' % self.version )
         self.make_listPanel(self)
         self.make_editAria(self)
 
@@ -80,11 +90,7 @@ class MemoPad( Frame ):
 
 
         def bye():
-            for i in self.memos:
-                f = open( 'memo/%s%06d.memo' % (i.getDatetime().strftime("%Y-%m-%dT%H%M%S"),
-                                           i.getDatetime().microsecond), "w")
-                f.write( i.getText().encode('shift_jis') )
-
+            self.saveImage()
             print 'bye'
             self.master.destroy()
 
@@ -107,16 +113,24 @@ class MemoPad( Frame ):
 
             if self.selectedIndex != -1:
                 self.saveMemo( self.memos[self.selectedIndex] )
+                updateLine( self.selectedIndex )
                 print '--- save %d---' % self.selectedIndex
 
             self.selectedIndex = newIndex
             self.openMemo( self.memos[self.selectedIndex] )
             print '---select %d---' % self.selectedIndex
 
-            self.fill_testlist()
+#            self.fill_testlist()
+
             self.memoList.selection_set( self.selectedIndex )
             self.memoList.see( self.selectedIndex )
 
+
+        def updateLine( index ):
+            self.memoList.delete(index)
+            self.memoList.insert(index, 
+                                 "%s | %s" % (self.memos[index].getDatetime().strftime("%Y-%m-%d %H:%M"),
+                                              self.memos[index].getTitle()))
 
 
 
@@ -130,8 +144,13 @@ class MemoPad( Frame ):
 
         self.newbtn = Button( btnfrm,
                               text='new',
-                              command=self.addMemo )
-        self.newbtn.pack(side=TOP)
+                              command=self.appendMemo )
+        self.newbtn.pack(side=TOP, fill=X)
+
+        Button( btnfrm,
+                text='delete',
+                command=self.removeMemo ).pack(side=TOP, fill=X)
+
 
         btnfrm.pack(side=LEFT)
 
@@ -148,15 +167,29 @@ class MemoPad( Frame ):
         self.memoList.delete(0, END)
         for memo in self.memos:
             self.memoList.insert(END, 
-                                 "%s | %s" % (memo.getDatetime(), memo.getTitle()))
+                                 "%s | %s" % (memo.getDatetime().strftime("%Y-%m-%d %H:%M"),
+                                              memo.getTitle()))
 
 
-    def addMemo(self):
+    def appendMemo(self):
         newMemo = Memo()
-        self.memos.append( newMemo )
-        newMemo.setText("abc def")
+#        self.memos.append( newMemo )
+        self.memos.insert(0, newMemo )
+        newMemo.setText("**no-subject**")
 
         self.fill_testlist()
+
+    def removeMemo(self):
+        if self.selectedIndex == -1: return
+
+        rmvtarget = self.memos[self.selectedIndex]
+        print "rmvÅu", rmvtarget.getText(), "Åv"
+        self.memos.remove( rmvtarget )
+
+        self.fill_testlist()
+        self.openMemo( self.memos[self.selectedIndex] )
+        self.memoList.selection_set( self.selectedIndex )
+        self.memoList.see( self.selectedIndex )
 
 
     def openMemo( self,memo ):
@@ -179,7 +212,7 @@ class MemoPad( Frame ):
 
 
 if __name__ == '__main__':
-    testwindow = MemoPad()
+    testwindow = MemoPadFrame()
     testwindow.mainloop()
 
 
