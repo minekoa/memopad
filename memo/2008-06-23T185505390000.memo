@@ -1,0 +1,26 @@
+今日勉強したこと
+
+・リストを選択時に変える方法。Tkではサポートされていないので、
+<Button> にイベントをバインドすると良い。
+このとき Mode SINGLE は相性が悪いらしい
+
+http://www-acc.kek.jp/WWW-ACC-exp/KEKB/Control/Activity/Python/doc-j/TkIntro/ListboxWidget.html
+
+
+・プログラムの終了をフックする方法
+
+http://d.hatena.ne.jp/Cassiopeia/20070821/1187701922
+http://d.hatena.ne.jp/Cassiopeia/20070822/1187712650
+
+
+・ファイルの読み書き
+f.read().decode("shift_jis")
+f.write( text.encode("shift_jis" ) が良い
+
+ハマったこと
+　リストをクリアするとカーソルが外れる。そうすると、リスト選択時処理がヘンになる
+（選択されてないから例外発生しまくり）
+
+また、その行だけ更新しようとしてもドラッグ（BROWSEモード）しているときはずれてしまって、本来出来ないはずの２行選択になってしまう。注意。
+
+あと、 listbox.activate( index )じゃ、選択できないのがわかった。
