@@ -36,6 +36,10 @@ class Memo (Subject):
         except IndexError:
             return self.text
 
+    def getId(self):
+        '''メモのユニークID を返す; 生成時刻を 文字列化したものをIDとする'''
+        return '%s%06d' % (self.datetime.strftime("%Y-%m-%dT%H%M%S"),
+                           self.datetime.microsecond )
 
     def getText(self):
         return self.text
@@ -120,8 +124,7 @@ class MemoPad(Subject):
 
 
     def memoToFilename(self, memo):
-        return '%s%06d.memo' % (memo.getDatetime().strftime("%Y-%m-%dT%H%M%S"),
-                                memo.getDatetime().microsecond )
+        return '%s.memo' % memo.getId()
 
 
     def saveImage(self):
@@ -130,6 +133,7 @@ class MemoPad(Subject):
             f.write( i.getText().encode('ms932') )
 
         self.sendToTrashboxImage()
+        self.notifyUpdate("saveImage", self)
 
     def sendToTrashboxImage(self):
         '''
@@ -163,7 +167,7 @@ class MemoPad(Subject):
         self.memos.insert(0, newMemo )
         self.selectedIndex = 0
 
-        self.notifyUpdate("appendMemo", self)
+        self.notifyUpdate("appendMemo", newMemo)
 
 
     def removeMemo(self):
@@ -176,7 +180,7 @@ class MemoPad(Subject):
             self.selectedIndex = len(self.memos) -1
 
         self.trashbox.append( rmvtarget ) # イメージファイルから除去するために覚えておく
-        self.notifyUpdate("removeMemo", self)
+        self.notifyUpdate("removeMemo", rmvtarget)
 
 
     def selectMemo(self, index):
@@ -186,7 +190,7 @@ class MemoPad(Subject):
         if self.selectedIndex == index: return
 
         self.selectedIndex = index
-        self.notifyUpdate("selectMemo", self)
+        self.notifyUpdate("selectMemo", self.getSelectedItem())
 
 
     #==================================
@@ -211,6 +215,51 @@ class MemoPad(Subject):
         return self.memos.__len__()
 
 
+class ChangeLogger(object):
+    def __init__(self):
+        self.file = open('change.log', 'a+')
+        self.file.write( '\n\nopen: %s\n' % datetime.now() )
+        self.file.write( '=' * 40 + '\n' )
+
+    def update( self, aspect, obj ):
+        # 無視するアクション
+        if aspect == 'selectMemo': return
+
+        # アクションの記録
+        self.file.write( '@@%s (%s): ' % (aspect, datetime.now()) )
+
+        if aspect == 'setText':
+            self.file.write('id=%s\n' % obj.getId() )
+            for line in obj.getText().splitlines():
+                self.file.write('+ %s\n' % line.encode('ms932'))
+            self.file.write('\n')
+
+        elif aspect == 'appendMemo':
+            self.file.write('id=%s\n\n' % obj.getId() )
+
+        elif aspect == 'removeMemo':
+            self.file.write( 'id=%s / %s\n\n' % (obj.getId(), obj.getTitle().encode('ms932')) )
+
+        elif aspect == 'loadImage':
+            self.file.write('\n')
+            for item in obj:
+                self.file.write( '>>> %s / %s\n' % (item.getId(), item.getTitle().encode('ms932')) )
+            self.file.write('\n')
+
+        elif aspect == 'saveImage':
+            self.file.write('\n')
+            for item in obj:
+                self.file.write( '<<< %s / %s\n' % (item.getId(), item.getTitle().encode('ms932')) )
+            self.file.write('\n')
+
+        else:
+            self.file.write('\n\n')
+
+        # ファイルに書き出し
+        self.file.flush()
+
+
+
 from Tkinter import *
 from tkscrlist import *
 from ScrolledText import *
@@ -222,9 +271,13 @@ class MemoPadFrame( Frame ):
         Frame.__init__(self, master)
 
         # Modelの初期化
-        self.version = (0, 2, 4)
+        self.version = (0, 2, 5)
         self.memos = MemoPad()
         self.memos.addObserver(self)
+
+        # change-logger のバインド
+        self.changeLogger = ChangeLogger()
+        self.memos.addObserver( self.changeLogger )
 
         # View-Controller の初期化
         self.master.title( 'MemoPad %d.%d.%d' % self.version )
@@ -234,6 +287,7 @@ class MemoPadFrame( Frame ):
 
         # データの復帰
         self.memos.loadImage()
+
 
         def bye():
             self.saveMemo()    # 現在編集中のメモをセーブ
@@ -320,13 +374,18 @@ class MemoPadFrame( Frame ):
 
         self.text.bind('<Key>', updateTitle )
 
+    #==================================
+    # observer
+    #==================================
+
     def update(self, aspect, obj):
+        if aspect == 'saveImage' : return
+
         # リストの表示 (全更新 or 選択行の変更)
         if aspect == "selectMemo":
             self.selectList()
         elif aspect == "setText":
             self.renderOneLine(self.memos.getSelectedIndex())
-            print 'one'
         else:
             self.renderList()
 
