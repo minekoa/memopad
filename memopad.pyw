@@ -127,17 +127,18 @@ class MemoPad(Subject):
                                        int(matobj.group(5)),
                                        int(matobj.group(6)),
                                        int(matobj.group(7)) ) )
-                memo.setText( open( filepath, 'r' ).read().decode('ms932') )
+#->3k                memo.setText( open( filepath, 'r' ).read().decode('ms932') )
+                memo.setText( open( filepath, 'r' ).read() )
 
                 # タグでのフィルタリング
                 if tag != '' and memo.getTag() != tag:
-#                    print 'skip (no match tag[%s])' % tag, memo.getDatetime().__str__(),memo.getTitle()
+                    print('skip (no match tag[%s])' % tag, memo.getDatetime().__str__(),memo.getTitle())
                     continue
 
                 # 登録
                 memo.addObserver(self)
                 self.memos.insert(0, memo)
-#                print memo.getDatetime().__str__(),memo.getTitle()
+                print( memo.getDatetime().__str__(),memo.getTitle() )
         if self.childDir != '': os.chdir('..') 
 
         # カーソルの初期化
@@ -154,8 +155,12 @@ class MemoPad(Subject):
 
     def saveImage(self):
         for i in self.memos:
-            f = open( os.path.join(self.childDir, self.memoToFilename(i)), 'w' )
-            f.write( i.getText().encode('ms932') )
+#->3k            f = open( os.path.join(self.childDir, self.memoToFilename(i)), 'w' )
+#->3k            f.write( i.getText().encode('ms932') )
+            f = open( os.path.join(self.childDir, self.memoToFilename(i)),
+                      'w',
+                      encoding='ms932')
+            f.write( i.getText() )
 
         self.sendToTrashboxImage()
         self.notifyUpdate("saveImage", self)
@@ -169,13 +174,21 @@ class MemoPad(Subject):
             try:
                 os.remove( 'memo/%s' % self.memoToFilename(i) )
 
-                f = open( 'memo/trash/%s' % self.memoToFilename(i), 'w' )
-                f.write( i.getText().encode('ms932') )
+#->3k                f = open( 'memo/trash/%s' % self.memoToFilename(i), 'w' )
+#->3k                f.write( i.getText().encode('ms932') )
+                f = open( 'memo/trash/%s' % self.memoToFilename(i),
+                          'w',
+                          encoding='ms932')
+                f.write( i.getText() )
 
             except OSError: # イメージファイルが無い
                 if not i.isEmpty():
-                    f = open( 'memo/trash/%s' % self.memoToFilename(i), 'w' )
-                    f.write( i.getText().encode('ms932') )
+#->3k                    f = open( 'memo/trash/%s' % self.memoToFilename(i), 'w' )
+#->3k                    f.write( i.getText().encode('ms932') )
+                    f = open( 'memo/trash/%s' % self.memoToFilename(i),
+                              'w',
+                              encoding='ms932')
+                    f.write( i.getText() )
 
 
 
@@ -242,7 +255,8 @@ class MemoPad(Subject):
 
 class ChangeLogger(object):
     def __init__(self):
-        self.file = open('change.log', 'a+')
+#->3k        self.file = open('change.log', 'a+')
+        self.file = open('change.log', 'a+', encoding='ms932')
         self.file.write( '\n\nopen: %s\n' % datetime.now() )
         self.file.write( '=' * 40 + '\n' )
 
@@ -256,25 +270,29 @@ class ChangeLogger(object):
         if aspect == 'setText':
             self.file.write('id=%s\n' % obj.getId() )
             for line in obj.getText().splitlines():
-                self.file.write('+ %s\n' % line.encode('ms932'))
+#->3k                self.file.write('+ %s\n' % line.encode('ms932'))
+                self.file.write('+ %s\n' % line)
             self.file.write('\n')
 
         elif aspect == 'appendMemo':
             self.file.write('id=%s\n\n' % obj.getId() )
 
         elif aspect == 'removeMemo':
-            self.file.write( 'id=%s / %s\n\n' % (obj.getId(), obj.getTitle().encode('ms932')) )
+#->3k            self.file.write( 'id=%s / %s\n\n' % (obj.getId(), obj.getTitle().encode('ms932')) )
+            self.file.write( 'id=%s / %s\n\n' % (obj.getId(), obj.getTitle()) )
 
         elif aspect == 'loadImage':
             self.file.write('\n')
             for item in obj:
-                self.file.write( '>>> %s / %s\n' % (item.getId(), item.getTitle().encode('ms932')) )
+#->3k                self.file.write( '>>> %s / %s\n' % (item.getId(), item.getTitle().encode('ms932')) )
+                self.file.write( '>>> %s / %s\n' % (item.getId(), item.getTitle()) )
             self.file.write('\n')
 
         elif aspect == 'saveImage':
             self.file.write('\n')
             for item in obj:
-                self.file.write( '<<< %s / %s\n' % (item.getId(), item.getTitle().encode('ms932')) )
+#->3k                self.file.write( '<<< %s / %s\n' % (item.getId(), item.getTitle().encode('ms932')) )
+                self.file.write( '<<< %s / %s\n' % (item.getId(), item.getTitle()) )
             self.file.write('\n')
 
         else:
@@ -285,16 +303,16 @@ class ChangeLogger(object):
 
 
 
-from Tkinter import *
+from tkinter import *
 from tkscrlist import *
-from ScrolledText import *
-
+#->3k	from ScrolledText import *
+from tkinter.scrolledtext import *
 
 class MemoPadFrame( Frame ):
 
     def __init__(self, aMemoPad, mode='w', master=None):
         Frame.__init__(self, master)
-        self.version = (0, 2, 6)
+        self.version = (0, 2, 7)
 
         # Modelの初期化
         self.memos = aMemoPad
@@ -311,7 +329,7 @@ class MemoPadFrame( Frame ):
                 self.saveMemo()    # 現在編集中のメモをセーブ
                 self.memos.saveImage()
 
-#                print 'bye'
+                print( 'bye' )
                 self.master.destroy()
 
             self.master.protocol('WM_DELETE_WINDOW', bye )
@@ -369,8 +387,12 @@ class MemoPadFrame( Frame ):
 
 
     def make_editAria(self, parent):
-        self.text = ScrolledText( parent )
-        self.text.pack(side=TOP, fill=BOTH)
+#->3k        self.text = ScrolledText( parent )
+        self.text = ScrolledText( parent,
+                                  width=60,
+                                  height=20 )
+        self.text.pack(side=TOP,
+                       fill=BOTH)
 
         def updateTitle(evt):
             '''実験コード。まだ
@@ -385,8 +407,9 @@ class MemoPadFrame( Frame ):
                 self.memoList.delete(itemnum)
                 self.memoList.insert(itemnum,
                              "%s | %s" % (self.memos[itemnum].getDatetime().strftime("%Y-%m-%d %H:%M"),
-                                          u'%s%s%s' % ( self.text.get('1.0', INSERT), 
-                                                        evt.char.decode('utf_8'),
+                                          '%s%s%s' % ( self.text.get('1.0', INSERT), 
+#->3k                                                        evt.char.decode('utf_8'),
+                                                        evt.char,
                                                         self.text.get(INSERT, '1.end'))))
                 self.memoList.selection_clear(0,END)
                 self.memoList.selection_set(itemnum)
@@ -394,6 +417,16 @@ class MemoPadFrame( Frame ):
 
 
         self.text.bind('<Key>', updateTitle )
+
+        def ime_ctrl_M(evt):
+            """
+            IMEでCTRL-Mで全文確定したとき
+            入力がテキストにインサートされない問題に対するパッチ
+            確定入力のとき、evt.keycode が 0 になっていることを利用する
+            """
+            if evt.keycode == 0:
+                self.text.insert( INSERT, evt.char )
+        self.text.bind('<Control-Key>', ime_ctrl_M)
 
     #==================================
     # observer
@@ -414,7 +447,7 @@ class MemoPadFrame( Frame ):
         if aspect != "setText":
             self.renderTextArea()
 
-#        print "disyplay update (%s)" % aspect
+        print( "disyplay update (%s)" % aspect )
 
 
 
@@ -484,7 +517,7 @@ class MemoPadFrame( Frame ):
         if memo.getText() == self.text.get('1.0', END)[:-1]: return # 内容が同じ場合はなにもしない
 
         self.memos.getSelectedItem().setText( self.text.get('1.0', END)[:-1] )
-#        print '--- save "%s"---' % memo.getTitle()
+        print( '--- save "%s"---' % memo.getTitle() )
 
     def selectMemo( self, index ):
         self.memos.selectMemo( index )

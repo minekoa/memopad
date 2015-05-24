@@ -1,5 +1,5 @@
 
-from Tkinter import *
+from tkinter import *
 
 class ScrolledListbox(Listbox):
     """ Listbox with vertical scroll bar """
