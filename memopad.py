@@ -60,7 +60,7 @@ class MemoPad(Subject):
 
         # メンバの初期化
         self.memos = []
-        self.selectedIndex = -1
+        self.selectedIndex = None
 
         self.trashbox = []
 
@@ -70,12 +70,14 @@ class MemoPad(Subject):
     #==================================
 
     def getSelectedItem(self):
-        if self.selectedIndex == -1 : return None
+        if self.selectedIndex == None : return None
         return self.memos[self.selectedIndex]
 
     def getSelectedIndex(self):
         return self.selectedIndex
 
+    def size(self):
+        return len(self.memos)
 
     #==================================
     # selealization
@@ -86,7 +88,7 @@ class MemoPad(Subject):
 
         # 既存イメージのクリア
         self.memos = []
-        self.selectedIndex = -1
+        self.selectedIndex = None
 
         # イメージリストのロード
         os.chdir('memo') 
@@ -112,6 +114,9 @@ class MemoPad(Subject):
         # カーソルの初期化
         if len(self.memos) != 0:
             self.selectedIndex = 0
+
+        self.notifyUpdate("loadImage", self)
+
 
 
     def memoToFilename(self, memo):
@@ -153,7 +158,6 @@ class MemoPad(Subject):
 
     def appendMemo(self):
         newMemo = Memo()
-#        newMemo.setText("**no-subject**")
         newMemo.addObserver(self)
 
         self.memos.insert(0, newMemo )
@@ -179,8 +183,9 @@ class MemoPad(Subject):
         if index < 0 or len(self.memos) <= index:
             raise IndexError( "%d is not contain [0..%d)" % (index, len(self.memos)) )
 
-        self.selectedIndex = index
+        if self.selectedIndex == index: return
 
+        self.selectedIndex = index
         self.notifyUpdate("selectMemo", self)
 
 
@@ -217,9 +222,8 @@ class MemoPadFrame( Frame ):
         Frame.__init__(self, master)
 
         # Modelの初期化
-        self.version = (0, 2, 2)
+        self.version = (0, 2, 3)
         self.memos = MemoPad()
-        self.memos.loadImage()
         self.memos.addObserver(self)
 
         # View-Controller の初期化
@@ -228,12 +232,13 @@ class MemoPadFrame( Frame ):
         self.make_editAria(self)
         self.pack(fill=BOTH)
 
-        self.update(None,None)
-
+        # データの復帰
+        self.memos.loadImage()
 
         def bye():
-            self.saveMemo( self.memos.getSelectedItem() ) # 現在編集中のメモをセーブ
+            self.saveMemo()    # 現在編集中のメモをセーブ
             self.memos.saveImage()
+
             print 'bye'
             self.master.destroy()
 
@@ -245,18 +250,16 @@ class MemoPadFrame( Frame ):
 
         # リストの生成・配置
         def changeTarget(evt):
-            curSel = self.memoList.curselection()
-            newIndex = int(curSel[0])
-
-            self.saveMemo( self.memos.getSelectedItem() )
-            self.memos.selectMemo( newIndex )
+            self.saveMemo()
+            self.selectMemo()
 
 
         self.memoList = ScrolledListbox(frm,
                                         selectmode=BROWSE,
-                                        width=70,
-                                        height=5 )
+                                        width=72,
+                                        height=7 )
         self.memoList.bind("<ButtonRelease>", changeTarget )
+        self.memoList.bind('<B1-Motion>', changeTarget )
         self.memoList.pack(side=LEFT, fill=BOTH)
 
 
@@ -264,6 +267,7 @@ class MemoPadFrame( Frame ):
         btnfrm = Frame(frm)
 
         def appendMemo():
+            self.saveMemo()
             self.memos.appendMemo()
 
         Button( btnfrm,
@@ -272,6 +276,7 @@ class MemoPadFrame( Frame ):
 
 
         def deleteMemo():
+            self.saveMemo()
             self.memos.removeMemo()
 
         Button( btnfrm,
@@ -291,9 +296,13 @@ class MemoPadFrame( Frame ):
 
 
     def update(self, aspect, obj):
-        if aspect != "selectMemo":
+        # リストの表示 (全更新 or 選択行の変更)
+        if aspect == "selectMemo":
+            self.selectList()
+        else:
             self.renderList()
 
+        # テキストエリアの表示
         self.renderTextArea()
 
         print "disyplay update (%s)" % aspect
@@ -311,12 +320,29 @@ class MemoPadFrame( Frame ):
                                  "%s | %s" % (memo.getDatetime().strftime("%Y-%m-%d %H:%M"),
                                               memo.getTitle()))
 
+        if self.memos.getSelectedItem() != None:
+            self.memoList.selection_set( self.memos.getSelectedIndex() )
+            self.memoList.see( self.memos.getSelectedIndex() )
+
+
+    def selectList(self):
+        try:
+            if int(self.memoList.curselection()[0]) == self.memos.getSelectedIndex():
+                return
+        except: # そもそも選択が成されていない
+            pass
+
+        self.memoList.selection_clear(0,END)
         self.memoList.selection_set( self.memos.getSelectedIndex() )
         self.memoList.see( self.memos.getSelectedIndex() )
 
 
     def renderTextArea(self):
-        self.openMemo( self.memos.getSelectedItem() )
+        if self.memos.getSelectedItem() == None:
+            self.text.delete('1.0', END )
+        else:
+            self.text.delete('1.0', END )
+            self.text.insert(END, self.memos.getSelectedItem().getText())
 
 
     def updateLine( index ):
@@ -327,22 +353,26 @@ class MemoPadFrame( Frame ):
 
 
     #==================================
-    # editing
+    # controller-function (VC->M)
     #==================================
 
-    def openMemo( self, memo ):
-        self.text.delete('1.0', END )
-        self.text.insert(END, 
-                         memo.getText() )
+    def saveMemo( self, memo=None ):
+        if memo == None:
+            memo = self.memos.getSelectedItem()
+            if memo == None: return
 
-    def saveMemo( self, memo ):
-        if memo.getText() == self.text.get('1.0', END)[:-1]: return
+        if memo.getText() == self.text.get('1.0', END)[:-1]: return # 内容が同じ場合はなにもしない
 
-        memo.setText( self.text.get('1.0', END)[:-1] )
+        self.memos.getSelectedItem().setText( self.text.get('1.0', END)[:-1] )
         print '--- save "%s"---' % memo.getTitle()
 
+    def selectMemo( self, index=None ):
+        if index == None:
+            curSel = self.memoList.curselection()
+            if curSel == (): return  # 選択されていない
+            index = int(curSel[0])
 
-
+        self.memos.selectMemo( index )
 
 
 if __name__ == '__main__':
