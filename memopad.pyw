@@ -131,13 +131,13 @@ class MemoPad(Subject):
 
                 # タグでのフィルタリング
                 if tag != '' and memo.getTag() != tag:
-                    print 'skip (no match tag[%s])' % tag, memo.getDatetime().__str__(),memo.getTitle()
+#                    print 'skip (no match tag[%s])' % tag, memo.getDatetime().__str__(),memo.getTitle()
                     continue
 
                 # 登録
                 memo.addObserver(self)
                 self.memos.insert(0, memo)
-                print memo.getDatetime().__str__(),memo.getTitle()
+#                print memo.getDatetime().__str__(),memo.getTitle()
         if self.childDir != '': os.chdir('..') 
 
         # カーソルの初期化
@@ -311,7 +311,7 @@ class MemoPadFrame( Frame ):
                 self.saveMemo()    # 現在編集中のメモをセーブ
                 self.memos.saveImage()
 
-                print 'bye'
+#                print 'bye'
                 self.master.destroy()
 
             self.master.protocol('WM_DELETE_WINDOW', bye )
@@ -414,7 +414,7 @@ class MemoPadFrame( Frame ):
         if aspect != "setText":
             self.renderTextArea()
 
-        print "disyplay update (%s)" % aspect
+#        print "disyplay update (%s)" % aspect
 
 
 
@@ -484,7 +484,7 @@ class MemoPadFrame( Frame ):
         if memo.getText() == self.text.get('1.0', END)[:-1]: return # 内容が同じ場合はなにもしない
 
         self.memos.getSelectedItem().setText( self.text.get('1.0', END)[:-1] )
-        print '--- save "%s"---' % memo.getTitle()
+#        print '--- save "%s"---' % memo.getTitle()
 
     def selectMemo( self, index ):
         self.memos.selectMemo( index )

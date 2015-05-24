@@ -1,13 +1,5 @@
 MemoPad 更新履歴
 
-0.2.6 (2008-08-18)
-・Viewerモードの追加
-　・Model を V-M に DI するデザインに変更
-　・Memo に getTag を追加
-　・MemoPad.loadImage に chldir と tag 引数を追加
-　・MemoPadFreme.__init__ に mode 'r' 'w' を追加
-　・ウインドウタイトルに メモのパス名と フィルタしたタグ名を追加
-
 0.2.5 (2008-07-03)
 ・チェンジログ（更新ログ）機能の追加
 
