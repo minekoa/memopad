@@ -1,0 +1,33 @@
+"～" (uFF5E) を含む文字列のencode/ decode
+
+
+Tkinter の Text で入力した ～をエンコード出来ない問題。
+
+コード：
+　f.write( i.getText().encode('ms932') )
+
+エラーメッセージ：
+　    f.write( i.getText().encode('shift_jis') )
+　UnicodeEncodeError: 'shift_jis' codec can't encode character u'\uff5e' in positi
+　on 215: illegal multibyte sequence
+
+
+
+このように修正するとよい：
+
+　f.write( i.getText().encode('ms932') )
+
+
+
+\uff5e  は、ms932 が扱う「～」なのだけれど、これは文字の意味としては正しくない変換だそうで、本当の Shift-JIS では \u301c になります。
+
+が、WInidows 上では ms932 で動いているので、入力するときに \uff5e が tk.Text に入っちゃうのかな？これを S-JISエンコーダではエンコードできないので、ms932 に差し替えた方がうまく行くと言う話と思います。
+
+
+参考URL
+
+・[pgsql-jp: 25214] Re: Windows上JDBC でのエンコーディング
+　　http://ml.postgresql.jp/pipermail/pgsql-jp/2002-March/008776.html
+
+・JIS-Unicode間の変換表の選択について
+　　http://hp.vector.co.jp/authors/VA010341/unicode/

@@ -44,6 +44,8 @@ class Memo (Subject):
         self.text = text
         self.notifyUpdate("setText", self)
 
+    def isEmpty(self):
+        return self.text == ''
 
 
 import os
@@ -99,7 +101,7 @@ class MemoPad(Subject):
                                        int(matobj.group(5)),
                                        int(matobj.group(6)),
                                        int(matobj.group(7)) ) )
-                memo.setText( open( filepath, 'r' ).read().decode('shift_jis') )
+                memo.setText( open( filepath, 'r' ).read().decode('ms932') )
 
                 # 登録
                 memo.addObserver(self)
@@ -120,15 +122,29 @@ class MemoPad(Subject):
     def saveImage(self):
         for i in self.memos:
             f = open( 'memo/%s' % self.memoToFilename(i), 'w' )
-            f.write( i.getText().encode('shift_jis') )
+            f.write( i.getText().encode('ms932') )
 
-        self.clearTrashbox()
+        self.sendToTrashboxImage()
 
-
-    def clearTrashbox(self):
+    def sendToTrashboxImage(self):
+        '''
+        trashbox に入れられた memo のイメージファイルを
+        memo/ から削除し、memo/trash/ に保存する。
+        '''
         for i in self.trashbox:
-            os.remove( 'memo/%s' % self.memoToFilename(i) )
-            print "rmv「", rmvtarget.getText(), "」"
+            try:
+                os.remove( 'memo/%s' % self.memoToFilename(i) )
+
+                f = open( 'memo/trash/%s' % self.memoToFilename(i), 'w' )
+                f.write( i.getText().encode('ms932') )
+
+            except OSError: # イメージファイルが無い
+                if not i.isEmpty():
+                    f = open( 'memo/trash/%s' % self.memoToFilename(i), 'w' )
+                    f.write( i.getText().encode('ms932') )
+
+
+
 
 
     #==================================
@@ -137,7 +153,7 @@ class MemoPad(Subject):
 
     def appendMemo(self):
         newMemo = Memo()
-        newMemo.setText("**no-subject**")
+#        newMemo.setText("**no-subject**")
         newMemo.addObserver(self)
 
         self.memos.insert(0, newMemo )
@@ -201,7 +217,7 @@ class MemoPadFrame( Frame ):
         Frame.__init__(self, master)
 
         # Modelの初期化
-        self.version = (0, 2, 1)
+        self.version = (0, 2, 2)
         self.memos = MemoPad()
         self.memos.loadImage()
         self.memos.addObserver(self)
@@ -216,6 +232,7 @@ class MemoPadFrame( Frame ):
 
 
         def bye():
+            self.saveMemo( self.memos.getSelectedItem() ) # 現在編集中のメモをセーブ
             self.memos.saveImage()
             print 'bye'
             self.master.destroy()
@@ -232,8 +249,6 @@ class MemoPadFrame( Frame ):
             newIndex = int(curSel[0])
 
             self.saveMemo( self.memos.getSelectedItem() )
-            print '--- save %d---' % self.memos.getSelectedIndex()
-
             self.memos.selectMemo( newIndex )
 
 
@@ -266,19 +281,22 @@ class MemoPadFrame( Frame ):
 
         btnfrm.pack(side=LEFT)
 
-        frm.pack(side=TOP)
+        frm.pack(side=TOP, fill=X)
 
 
 
     def make_editAria(self, parent):
         self.text = ScrolledText( parent )
-        self.text.pack(side=TOP)
+        self.text.pack(side=TOP, fill=BOTH)
 
 
     def update(self, aspect, obj):
-        print "disyplay update (%s)" % aspect
-        self.renderList()
+        if aspect != "selectMemo":
+            self.renderList()
+
         self.renderTextArea()
+
+        print "disyplay update (%s)" % aspect
 
 
 
@@ -313,19 +331,15 @@ class MemoPadFrame( Frame ):
     #==================================
 
     def openMemo( self, memo ):
-        try:
-            self.text.delete('1.0', END )
-            self.text.insert(END, 
-                             memo.getText() )
-        except Exception, err:
-            print err
+        self.text.delete('1.0', END )
+        self.text.insert(END, 
+                         memo.getText() )
 
     def saveMemo( self, memo ):
-        try:
-            memo.setText( self.text.get('1.0', END)[:-1] )
+        if memo.getText() == self.text.get('1.0', END)[:-1]: return
 
-        except Exception, err:
-            print err
+        memo.setText( self.text.get('1.0', END)[:-1] )
+        print '--- save "%s"---' % memo.getTitle()
 
 
 
