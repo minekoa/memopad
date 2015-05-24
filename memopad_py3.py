@@ -36,6 +36,12 @@ class Memo (Subject):
         except IndexError:
             return self.text
 
+    def getTag(self):
+        ptn = re.compile( r"\[([^\[]+)\]" )
+        matobj = ptn.match( self.getTitle() )
+        if matobj == None: return ''
+        else: return matobj.group(1)
+
     def getId(self):
         '''メモのユニークID を返す; 生成時刻を 文字列化したものをIDとする'''
         return '%s%06d' % (self.datetime.strftime("%Y-%m-%dT%H%M%S"),
@@ -68,6 +74,9 @@ class MemoPad(Subject):
 
         self.trashbox = []
 
+        self.childDir = ''
+        self.tag = ''
+
 
     #==================================
     # accessing
@@ -83,19 +92,30 @@ class MemoPad(Subject):
     def size(self):
         return len(self.memos)
 
+    def imageTitle(self):
+        title = os.path.join( os.path.curdir,self.childDir)
+#        if  != '': title += '%s/' % self.childDir
+        if self.tag != '' : title += ' [%s]' % self.tag
+        return title
+
     #==================================
     # selealization
     #==================================
 
-    def loadImage(self):
+    def loadImage(self, childDir='', tag=''):
         ptn = re.compile( r"(\d{4})-(\d{2})-(\d{2})T(\d{2})(\d{2})(\d{2})(\d{6})\.memo" )
 
         # 既存イメージのクリア
         self.memos = []
         self.selectedIndex = None
 
+        # イメージロード元情報の記憶 (save時, イメージタイトル生成時に仕様)
+        self.childDir = childDir
+        self.tag = tag
+
         # イメージリストのロード
-        os.chdir('memo') 
+        if self.childDir != '': os.chdir(self.childDir) 
+
         for filepath in glob.glob("*.memo"):
             matobj = ptn.match( filepath )
             if matobj != None:
@@ -107,13 +127,19 @@ class MemoPad(Subject):
                                        int(matobj.group(5)),
                                        int(matobj.group(6)),
                                        int(matobj.group(7)) ) )
-                memo.setText( open( filepath, 'r' ).read().decode('ms932') )
+#->3k                memo.setText( open( filepath, 'r' ).read().decode('ms932') )
+                memo.setText( open( filepath, 'r' ).read() )
+
+                # タグでのフィルタリング
+                if tag != '' and memo.getTag() != tag:
+                    print('skip (no match tag[%s])' % tag, memo.getDatetime().__str__(),memo.getTitle())
+                    continue
 
                 # 登録
                 memo.addObserver(self)
                 self.memos.insert(0, memo)
-                print memo.getDatetime().__str__(),memo.getTitle()
-        os.chdir('..') 
+                print( memo.getDatetime().__str__(),memo.getTitle() )
+        if self.childDir != '': os.chdir('..') 
 
         # カーソルの初期化
         if len(self.memos) != 0:
@@ -129,8 +155,12 @@ class MemoPad(Subject):
 
     def saveImage(self):
         for i in self.memos:
-            f = open( 'memo/%s' % self.memoToFilename(i), 'w' )
-            f.write( i.getText().encode('ms932') )
+#->3k            f = open( os.path.join(self.childDir, self.memoToFilename(i)), 'w' )
+#->3k            f.write( i.getText().encode('ms932') )
+            f = open( os.path.join(self.childDir, self.memoToFilename(i)),
+                      'w',
+                      encoding='ms932')
+            f.write( i.getText() )
 
         self.sendToTrashboxImage()
         self.notifyUpdate("saveImage", self)
@@ -144,13 +174,21 @@ class MemoPad(Subject):
             try:
                 os.remove( 'memo/%s' % self.memoToFilename(i) )
 
-                f = open( 'memo/trash/%s' % self.memoToFilename(i), 'w' )
-                f.write( i.getText().encode('ms932') )
+#->3k                f = open( 'memo/trash/%s' % self.memoToFilename(i), 'w' )
+#->3k                f.write( i.getText().encode('ms932') )
+                f = open( 'memo/trash/%s' % self.memoToFilename(i),
+                          'w',
+                          encoding='ms932')
+                f.write( i.getText() )
 
             except OSError: # イメージファイルが無い
                 if not i.isEmpty():
-                    f = open( 'memo/trash/%s' % self.memoToFilename(i), 'w' )
-                    f.write( i.getText().encode('ms932') )
+#->3k                    f = open( 'memo/trash/%s' % self.memoToFilename(i), 'w' )
+#->3k                    f.write( i.getText().encode('ms932') )
+                    f = open( 'memo/trash/%s' % self.memoToFilename(i),
+                              'w',
+                              encoding='ms932')
+                    f.write( i.getText() )
 
 
 
@@ -217,7 +255,8 @@ class MemoPad(Subject):
 
 class ChangeLogger(object):
     def __init__(self):
-        self.file = open('change.log', 'a+')
+#->3k        self.file = open('change.log', 'a+')
+        self.file = open('change.log', 'a+', encoding='ms932')
         self.file.write( '\n\nopen: %s\n' % datetime.now() )
         self.file.write( '=' * 40 + '\n' )
 
@@ -231,25 +270,29 @@ class ChangeLogger(object):
         if aspect == 'setText':
             self.file.write('id=%s\n' % obj.getId() )
             for line in obj.getText().splitlines():
-                self.file.write('+ %s\n' % line.encode('ms932'))
+#->3k                self.file.write('+ %s\n' % line.encode('ms932'))
+                self.file.write('+ %s\n' % line)
             self.file.write('\n')
 
         elif aspect == 'appendMemo':
             self.file.write('id=%s\n\n' % obj.getId() )
 
         elif aspect == 'removeMemo':
-            self.file.write( 'id=%s / %s\n\n' % (obj.getId(), obj.getTitle().encode('ms932')) )
+#->3k            self.file.write( 'id=%s / %s\n\n' % (obj.getId(), obj.getTitle().encode('ms932')) )
+            self.file.write( 'id=%s / %s\n\n' % (obj.getId(), obj.getTitle()) )
 
         elif aspect == 'loadImage':
             self.file.write('\n')
             for item in obj:
-                self.file.write( '>>> %s / %s\n' % (item.getId(), item.getTitle().encode('ms932')) )
+#->3k                self.file.write( '>>> %s / %s\n' % (item.getId(), item.getTitle().encode('ms932')) )
+                self.file.write( '>>> %s / %s\n' % (item.getId(), item.getTitle()) )
             self.file.write('\n')
 
         elif aspect == 'saveImage':
             self.file.write('\n')
             for item in obj:
-                self.file.write( '<<< %s / %s\n' % (item.getId(), item.getTitle().encode('ms932')) )
+#->3k                self.file.write( '<<< %s / %s\n' % (item.getId(), item.getTitle().encode('ms932')) )
+                self.file.write( '<<< %s / %s\n' % (item.getId(), item.getTitle()) )
             self.file.write('\n')
 
         else:
@@ -260,46 +303,41 @@ class ChangeLogger(object):
 
 
 
-from Tkinter import *
-from tkscrlist import *
-from ScrolledText import *
-
+from tkinter import *
+from tkscrlist_py3 import *
+#->3k	from ScrolledText import *
+from tkinter.scrolledtext import *
 
 class MemoPadFrame( Frame ):
 
-    def __init__(self, master=None):
+    def __init__(self, aMemoPad, mode='w', master=None):
         Frame.__init__(self, master)
+        self.version = (0, 2, 7)
 
         # Modelの初期化
-        self.version = (0, 2, 5)
-        self.memos = MemoPad()
+        self.memos = aMemoPad
         self.memos.addObserver(self)
 
-        # change-logger のバインド
-        self.changeLogger = ChangeLogger()
-        self.memos.addObserver( self.changeLogger )
-
         # View-Controller の初期化
-        self.master.title( 'MemoPad %d.%d.%d' % self.version )
-        self.make_listPanel(self)
+        self.master.title( 'MemoPad %d.%d.%d (for Python3)' % self.version + ' -' + self.memos.imageTitle() )
+        self.make_listPanel(self, mode)
         self.make_editAria(self)
         self.pack(fill=BOTH)
 
-        # データの復帰
-        self.memos.loadImage()
+        if mode == 'w':
+            def bye():
+                self.saveMemo()    # 現在編集中のメモをセーブ
+                self.memos.saveImage()
+
+                print( 'bye' )
+                self.master.destroy()
+
+            self.master.protocol('WM_DELETE_WINDOW', bye )
+
+        self.update("", self.memos)
 
 
-        def bye():
-            self.saveMemo()    # 現在編集中のメモをセーブ
-            self.memos.saveImage()
-
-            print 'bye'
-            self.master.destroy()
-
-        self.master.protocol('WM_DELETE_WINDOW', bye )
-
-
-    def make_listPanel(self, parent):
+    def make_listPanel(self, parent, mode):
         frm = Frame(parent)
 
         # リストの生成・配置
@@ -321,35 +359,40 @@ class MemoPadFrame( Frame ):
 
 
         # ボタンの作成
-        btnfrm = Frame(frm)
+        if mode == 'w':
+            btnfrm = Frame(frm)
 
-        def appendMemo():
-            self.saveMemo()
-            self.memos.appendMemo()
+            def appendMemo():
+                self.saveMemo()
+                self.memos.appendMemo()
 
-        Button( btnfrm,
-                text='new',
-                command=appendMemo ).pack(side=TOP, fill=X)
-
-
-        def deleteMemo():
-            self.saveMemo()
-            self.memos.removeMemo()
-
-        Button( btnfrm,
-                text='delete',
-                command=deleteMemo ).pack(side=TOP, fill=X)
+            Button( btnfrm,
+                    text='new',
+                    command=appendMemo ).pack(side=TOP, fill=X)
 
 
-        btnfrm.pack(side=LEFT)
+            def deleteMemo():
+                self.saveMemo()
+                self.memos.removeMemo()
+
+            Button( btnfrm,
+                    text='delete',
+                    command=deleteMemo ).pack(side=TOP, fill=X)
+
+
+            btnfrm.pack(side=LEFT)
 
         frm.pack(side=TOP, fill=X)
 
 
 
     def make_editAria(self, parent):
-        self.text = ScrolledText( parent )
-        self.text.pack(side=TOP, fill=BOTH)
+#->3k        self.text = ScrolledText( parent )
+        self.text = ScrolledText( parent,
+                                  width=60,
+                                  height=20 )
+        self.text.pack(side=TOP,
+                       fill=BOTH)
 
         def updateTitle(evt):
             '''実験コード。まだ
@@ -364,8 +407,9 @@ class MemoPadFrame( Frame ):
                 self.memoList.delete(itemnum)
                 self.memoList.insert(itemnum,
                              "%s | %s" % (self.memos[itemnum].getDatetime().strftime("%Y-%m-%d %H:%M"),
-                                          u'%s%s%s' % ( self.text.get('1.0', INSERT), 
-                                                        evt.char.decode('utf_8'),
+                                          '%s%s%s' % ( self.text.get('1.0', INSERT), 
+#->3k                                                        evt.char.decode('utf_8'),
+                                                        evt.char,
                                                         self.text.get(INSERT, '1.end'))))
                 self.memoList.selection_clear(0,END)
                 self.memoList.selection_set(itemnum)
@@ -374,10 +418,15 @@ class MemoPadFrame( Frame ):
 
         self.text.bind('<Key>', updateTitle )
 
-        def ime_ctrl_m(evt):
+        def ime_ctrl_M(evt):
+            """
+            IMEでCTRL-Mで全文確定したとき
+            入力がテキストにインサートされない問題に対するパッチ
+            確定入力のとき、evt.keycode が 0 になっていることを利用する
+            """
             if evt.keycode == 0:
                 self.text.insert( INSERT, evt.char )
-        self.text.bind('<Control-Key>',ime_ctrl_m)
+        self.text.bind('<Control-Key>', ime_ctrl_M)
 
     #==================================
     # observer
@@ -398,7 +447,7 @@ class MemoPadFrame( Frame ):
         if aspect != "setText":
             self.renderTextArea()
 
-        print "disyplay update (%s)" % aspect
+        print( "disyplay update (%s)" % aspect )
 
 
 
@@ -468,13 +517,22 @@ class MemoPadFrame( Frame ):
         if memo.getText() == self.text.get('1.0', END)[:-1]: return # 内容が同じ場合はなにもしない
 
         self.memos.getSelectedItem().setText( self.text.get('1.0', END)[:-1] )
-        print '--- save "%s"---' % memo.getTitle()
+        print( '--- save "%s"---' % memo.getTitle() )
 
     def selectMemo( self, index ):
         self.memos.selectMemo( index )
 
 if __name__ == '__main__':
-    testwindow = MemoPadFrame()
+
+    # Model の生成
+    model = MemoPad()
+    model.addObserver( ChangeLogger() )
+    model.loadImage('memo')
+#    model.loadImage('memo', tag='X8')
+
+    # V-C に連結
+    testwindow = MemoPadFrame(model)
+#    testwindow = MemoPadFrame(model, mode='r')
     testwindow.mainloop()
 
 

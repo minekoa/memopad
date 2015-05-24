@@ -1,2 +1,0 @@
-memopad.py
-pause
