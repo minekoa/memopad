@@ -222,7 +222,7 @@ class MemoPadFrame( Frame ):
         Frame.__init__(self, master)
 
         # Modelの初期化
-        self.version = (0, 2, 3)
+        self.version = (0, 2, 4)
         self.memos = MemoPad()
         self.memos.addObserver(self)
 
@@ -250,8 +250,11 @@ class MemoPadFrame( Frame ):
 
         # リストの生成・配置
         def changeTarget(evt):
+            try: index = int(self.memoList.curselection()[0])
+            except: index = None
+
             self.saveMemo()
-            self.selectMemo()
+            if index != None: self.selectMemo( index )
 
 
         self.memoList = ScrolledListbox(frm,
@@ -294,16 +297,42 @@ class MemoPadFrame( Frame ):
         self.text = ScrolledText( parent )
         self.text.pack(side=TOP, fill=BOTH)
 
+        def updateTitle(evt):
+            '''実験コード。まだ
+            改行や行末改行の削除に弱いです
+            '''
+#            print self.text.index('1.end')
+#            print self.text.index(INSERT)
+
+            if self.text.index(INSERT).split('.')[0] == '1': # 1行目
+                itemnum = self.memos.getSelectedIndex()
+
+                self.memoList.delete(itemnum)
+                self.memoList.insert(itemnum,
+                             "%s | %s" % (self.memos[itemnum].getDatetime().strftime("%Y-%m-%d %H:%M"),
+                                          u'%s%s%s' % ( self.text.get('1.0', INSERT), 
+                                                        evt.char.decode('utf_8'),
+                                                        self.text.get(INSERT, '1.end'))))
+                self.memoList.selection_clear(0,END)
+                self.memoList.selection_set(itemnum)
+                self.memoList.see(itemnum)
+
+
+        self.text.bind('<Key>', updateTitle )
 
     def update(self, aspect, obj):
         # リストの表示 (全更新 or 選択行の変更)
         if aspect == "selectMemo":
             self.selectList()
+        elif aspect == "setText":
+            self.renderOneLine(self.memos.getSelectedIndex())
+            print 'one'
         else:
             self.renderList()
 
         # テキストエリアの表示
-        self.renderTextArea()
+        if aspect != "setText":
+            self.renderTextArea()
 
         print "disyplay update (%s)" % aspect
 
@@ -337,19 +366,30 @@ class MemoPadFrame( Frame ):
         self.memoList.see( self.memos.getSelectedIndex() )
 
 
-    def renderTextArea(self):
-        if self.memos.getSelectedItem() == None:
-            self.text.delete('1.0', END )
-        else:
-            self.text.delete('1.0', END )
-            self.text.insert(END, self.memos.getSelectedItem().getText())
 
+    def renderOneLine(self, index ):
+        if self.memoList.get(index) == self.memos[index].getTitle(): return
 
-    def updateLine( index ):
+        try: indexbackup = int(self.memoList.curselection()[0])
+        except: indexbackup = self.memos.getSelectedIndex()
+
         self.memoList.delete(index)
-        self.memoList.insert(index, 
+        self.memoList.insert(index,
                              "%s | %s" % (self.memos[index].getDatetime().strftime("%Y-%m-%d %H:%M"),
                                           self.memos[index].getTitle()))
+
+        if indexbackup != None:
+            self.memoList.selection_clear(0,END)
+            self.memoList.selection_set(indexbackup)
+            self.memoList.see(indexbackup)
+
+
+
+    def renderTextArea(self):
+        self.text.delete('1.0', END )
+        if self.memos.getSelectedItem() != None:
+            self.text.insert(END, self.memos.getSelectedItem().getText())
+
 
 
     #==================================
@@ -366,14 +406,8 @@ class MemoPadFrame( Frame ):
         self.memos.getSelectedItem().setText( self.text.get('1.0', END)[:-1] )
         print '--- save "%s"---' % memo.getTitle()
 
-    def selectMemo( self, index=None ):
-        if index == None:
-            curSel = self.memoList.curselection()
-            if curSel == (): return  # 選択されていない
-            index = int(curSel[0])
-
+    def selectMemo( self, index ):
         self.memos.selectMemo( index )
-
 
 if __name__ == '__main__':
     testwindow = MemoPadFrame()

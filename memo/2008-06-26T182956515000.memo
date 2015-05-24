@@ -1,0 +1,17 @@
+今日勉強したこと
+
+Tk イベントについて：
+
+　evt.char        : 入力された文字列
+　evt.keycode  : キーコード
+　evt.key_sym : char に似てるけれど "Left" "Right" とかいう文字列が返ってくる
+
+　補足：
+　char については日本語を入力すると、バリバリUTF-8 で返ってくるので、
+　char.decode('utf_8') とするのが吉。
+
+
+Tk.Text について：
+　カーソル位置は、Tk.INSERT というラベルで取ってこれる t.index(Tk.INSERT)
+
+
